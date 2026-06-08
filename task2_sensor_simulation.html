@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Task 2 – Sensor Data Simulation</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --panel2: #1c2333;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --muted: #8b949e;
+    --green: #3fb950;
+    --blue: #58a6ff;
+    --orange: #f0883e;
+    --red: #f85149;
+    --yellow: #e3b341;
+    --purple: #bc8cff;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    min-height: 100vh;
+  }
+
+  .header {
+    background: var(--panel); border-bottom: 1px solid var(--border);
+    padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between;
+  }
+  .header-left { display: flex; align-items: center; gap: 12px; }
+  .status-dot {
+    width: 10px; height: 10px; border-radius: 50%; background: var(--green);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .header h1 { font-size: 1rem; font-weight: 600; font-family: 'IBM Plex Mono', monospace; }
+  .header-badge {
+    font-size: 0.72rem; font-family: 'IBM Plex Mono', monospace;
+    background: rgba(63,185,80,0.15); color: var(--green);
+    border: 1px solid rgba(63,185,80,0.3); padding: 3px 10px; border-radius: 20px;
+  }
+
+  .controls {
+    background: var(--panel); border-bottom: 1px solid var(--border);
+    padding: 0.75rem 2rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+  }
+  .ctrl-label { font-size: 0.8rem; color: var(--muted); font-family: 'IBM Plex Mono', monospace; }
+  button {
+    font-family: 'IBM Plex Mono', monospace; font-size: 0.8rem;
+    padding: 6px 16px; border-radius: 6px; border: 1px solid var(--border);
+    cursor: pointer; transition: all 0.15s;
+  }
+  .btn-start { background: rgba(63,185,80,0.15); color: var(--green); border-color: rgba(63,185,80,0.4); }
+  .btn-start:hover { background: rgba(63,185,80,0.25); }
+  .btn-stop { background: rgba(248,81,73,0.15); color: var(--red); border-color: rgba(248,81,73,0.4); }
+  .btn-stop:hover { background: rgba(248,81,73,0.25); }
+  .btn-clear { background: var(--panel2); color: var(--muted); }
+  .btn-clear:hover { color: var(--text); }
+  .btn-export { background: rgba(88,166,255,0.1); color: var(--blue); border-color: rgba(88,166,255,0.3); }
+  .btn-export:hover { background: rgba(88,166,255,0.2); }
+
+  select {
+    font-family: 'IBM Plex Mono', monospace; font-size: 0.8rem;
+    background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+    padding: 6px 10px; border-radius: 6px; cursor: pointer;
+  }
+
+  .main { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0; border-bottom: 1px solid var(--border); }
+
+  .sensor-card {
+    border-right: 1px solid var(--border); padding: 1.75rem;
+    position: relative; overflow: hidden;
+  }
+  .sensor-card:last-child { border-right: none; }
+
+  .sensor-label {
+    font-size: 0.7rem; font-family: 'IBM Plex Mono', monospace;
+    color: var(--muted); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 0.5rem;
+  }
+  .sensor-value {
+    font-size: 3rem; font-weight: 600; font-family: 'IBM Plex Mono', monospace;
+    line-height: 1; margin-bottom: 0.25rem;
+  }
+  .sensor-unit { font-size: 1.2rem; color: var(--muted); margin-left: 4px; }
+  .sensor-card:nth-child(1) .sensor-value { color: var(--orange); }
+  .sensor-card:nth-child(2) .sensor-value { color: var(--blue); }
+  .sensor-card:nth-child(3) .sensor-value { color: var(--purple); }
+
+  .sensor-status {
+    font-size: 0.78rem; color: var(--muted); margin-top: 0.5rem;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .sensor-status.ok { color: var(--green); }
+  .sensor-status.warn { color: var(--yellow); }
+  .sensor-status.alert { color: var(--red); }
+
+  .mini-bars {
+    display: flex; align-items: flex-end; gap: 2px;
+    height: 40px; margin-top: 1rem;
+  }
+  .mini-bar {
+    flex: 1; border-radius: 2px 2px 0 0; min-height: 4px;
+    transition: height 0.3s;
+  }
+  .sensor-card:nth-child(1) .mini-bar { background: rgba(240,136,62,0.5); }
+  .sensor-card:nth-child(2) .mini-bar { background: rgba(88,166,255,0.5); }
+  .sensor-card:nth-child(3) .mini-bar { background: rgba(188,140,255,0.5); }
+
+  /* Log section */
+  .log-section { padding: 1.5rem 2rem; }
+  .log-header {
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;
+  }
+  .log-title {
+    font-family: 'IBM Plex Mono', monospace; font-size: 0.8rem;
+    color: var(--muted); letter-spacing: 2px; text-transform: uppercase;
+  }
+  .log-count {
+    font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem;
+    color: var(--muted); background: var(--panel); padding: 2px 8px;
+    border: 1px solid var(--border); border-radius: 4px;
+  }
+
+  .log-table-wrap { overflow: auto; max-height: 320px; border-radius: 8px; border: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; font-family: 'IBM Plex Mono', monospace; font-size: 0.8rem; }
+  thead { background: var(--panel2); position: sticky; top: 0; z-index: 1; }
+  thead th {
+    padding: 0.6rem 1rem; text-align: left; color: var(--muted);
+    font-size: 0.72rem; letter-spacing: 1.5px; border-bottom: 1px solid var(--border);
+  }
+  tbody tr { border-bottom: 1px solid rgba(48,54,61,0.5); transition: background 0.1s; }
+  tbody tr:hover { background: var(--panel2); }
+  tbody td { padding: 0.55rem 1rem; color: var(--text); }
+  .td-temp { color: var(--orange); }
+  .td-hum { color: var(--blue); }
+  .td-motion { color: var(--purple); }
+  .td-status-ok { color: var(--green); }
+  .td-status-warn { color: var(--yellow); }
+  .td-status-alert { color: var(--red); }
+  .td-time { color: var(--muted); font-size: 0.75rem; }
+
+  /* Stats row */
+  .stats-row {
+    display: grid; grid-template-columns: repeat(6, 1fr); gap: 1px;
+    background: var(--border); border-top: 1px solid var(--border);
+  }
+  .stat-cell {
+    background: var(--panel); padding: 1rem 1.25rem; text-align: center;
+  }
+  .stat-cell .st-label { font-size: 0.68rem; color: var(--muted); font-family: 'IBM Plex Mono', monospace; margin-bottom: 4px; }
+  .stat-cell .st-val { font-size: 1.1rem; font-weight: 600; font-family: 'IBM Plex Mono', monospace; }
+  .stat-cell:nth-child(1) .st-val, .stat-cell:nth-child(2) .st-val { color: var(--orange); }
+  .stat-cell:nth-child(3) .st-val, .stat-cell:nth-child(4) .st-val { color: var(--blue); }
+  .stat-cell:nth-child(5) .st-val, .stat-cell:nth-child(6) .st-val { color: var(--purple); }
+
+  .footer {
+    text-align: center; padding: 1rem; font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem; color: var(--muted); border-top: 1px solid var(--border);
+  }
+  .footer span { color: var(--green); }
+
+  @media (max-width: 700px) {
+    .main { grid-template-columns: 1fr; }
+    .sensor-card { border-right: none; border-bottom: 1px solid var(--border); }
+    .stats-row { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="status-dot" id="statusDot"></div>
+    <h1>Sensor Data Simulation</h1>
+  </div>
+  <span class="header-badge" id="headerBadge">● IDLE</span>
+</div>
+
+<div class="controls">
+  <span class="ctrl-label">SENSOR SIM v1.0</span>
+  <button class="btn-start" onclick="startSim()">▶ Start</button>
+  <button class="btn-stop" onclick="stopSim()">■ Stop</button>
+  <button class="btn-clear" onclick="clearLog()">✕ Clear Log</button>
+  <button class="btn-export" onclick="exportCSV()">↓ Export CSV</button>
+  <span class="ctrl-label">Interval:</span>
+  <select id="intervalSel" onchange="updateInterval()">
+    <option value="1000">1s</option>
+    <option value="2000" selected>2s</option>
+    <option value="5000">5s</option>
+  </select>
+  <span class="ctrl-label">Scenario:</span>
+  <select id="scenarioSel" onchange="updateScenario()">
+    <option value="normal">Normal</option>
+    <option value="hot">Heat Wave</option>
+    <option value="humid">High Humidity</option>
+    <option value="motion">Motion Active</option>
+  </select>
+</div>
+
+<div class="main">
+  <div class="sensor-card">
+    <div class="sensor-label">Temperature</div>
+    <div class="sensor-value" id="tempVal">--<span class="sensor-unit">°C</span></div>
+    <div class="sensor-status" id="tempStatus">Sensor ready</div>
+    <div class="mini-bars" id="tempBars"></div>
+  </div>
+  <div class="sensor-card">
+    <div class="sensor-label">Humidity</div>
+    <div class="sensor-value" id="humVal">--<span class="sensor-unit">%</span></div>
+    <div class="sensor-status" id="humStatus">Sensor ready</div>
+    <div class="mini-bars" id="humBars"></div>
+  </div>
+  <div class="sensor-card">
+    <div class="sensor-label">Motion</div>
+    <div class="sensor-value" id="motVal">--<span class="sensor-unit"></span></div>
+    <div class="sensor-status" id="motStatus">Sensor ready</div>
+    <div class="mini-bars" id="motBars"></div>
+  </div>
+</div>
+
+<div class="stats-row">
+  <div class="stat-cell"><div class="st-label">TEMP MIN</div><div class="st-val" id="tMin">--</div></div>
+  <div class="stat-cell"><div class="st-label">TEMP MAX</div><div class="st-val" id="tMax">--</div></div>
+  <div class="stat-cell"><div class="st-label">HUM MIN</div><div class="st-val" id="hMin">--</div></div>
+  <div class="stat-cell"><div class="st-label">HUM MAX</div><div class="st-val" id="hMax">--</div></div>
+  <div class="stat-cell"><div class="st-label">MOTION EVENTS</div><div class="st-val" id="mCount">0</div></div>
+  <div class="stat-cell"><div class="st-label">TOTAL READINGS</div><div class="st-val" id="totalCount">0</div></div>
+</div>
+
+<div class="log-section">
+  <div class="log-header">
+    <span class="log-title">📋 Data Log</span>
+    <span class="log-count" id="logCount">0 records</span>
+  </div>
+  <div class="log-table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>TIMESTAMP</th>
+          <th>TEMPERATURE (°C)</th>
+          <th>HUMIDITY (%)</th>
+          <th>MOTION</th>
+          <th>STATUS</th>
+        </tr>
+      </thead>
+      <tbody id="logBody">
+        <tr>
+          <td colspan="6" style="text-align:center; color:var(--muted); padding: 2rem;">
+            Press ▶ Start to begin simulation
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="footer">DECODE LAB INTERNSHIP · <span>Task 2: Sensor Data Simulation</span> · Temperature | Humidity | Motion · CSV Export Ready</div>
+
+<script>
+  let simInterval = null;
+  let logData = [];
+  let tempHistory = [], humHistory = [], motHistory = [];
+  let motionCount = 0;
+
+  const scenarios = {
+    normal:  { tempBase: 24, tempRange: 6, humBase: 55, humRange: 20, motProb: 0.2 },
+    hot:     { tempBase: 38, tempRange: 8, humBase: 30, humRange: 10, motProb: 0.1 },
+    humid:   { tempBase: 28, tempRange: 4, humBase: 80, humRange: 15, motProb: 0.15 },
+    motion:  { tempBase: 22, tempRange: 4, humBase: 50, humRange: 15, motProb: 0.8 },
+  };
+
+  let currentScenario = 'normal';
+  let interval = 2000;
+
+  function rand(base, range) { return +(base - range/2 + Math.random() * range).toFixed(1); }
+
+  function getStatus(temp, hum) {
+    if (temp > 38 || hum > 85) return ['alert', '⚠ ALERT: Critical values'];
+    if (temp > 32 || hum > 70) return ['warn', '△ WARNING: High values'];
+    return ['ok', '✓ Normal range'];
+  }
+
+  function updateMiniBar(containerId, history, max) {
+    const c = document.getElementById(containerId);
+    c.innerHTML = '';
+    const recent = history.slice(-20);
+    recent.forEach(v => {
+      const bar = document.createElement('div');
+      bar.className = 'mini-bar';
+      const pct = Math.max(8, (v / max) * 100);
+      bar.style.height = pct + '%';
+      c.appendChild(bar);
+    });
+  }
+
+  function simulate() {
+    const s = scenarios[currentScenario];
+    const temp = rand(s.tempBase, s.tempRange);
+    const hum = Math.min(100, Math.max(0, rand(s.humBase, s.humRange)));
+    const motion = Math.random() < s.motProb ? 1 : 0;
+
+    tempHistory.push(temp);
+    humHistory.push(hum);
+    motHistory.push(motion * 100);
+    if (tempHistory.length > 20) tempHistory.shift();
+    if (humHistory.length > 20) humHistory.shift();
+    if (motHistory.length > 20) motHistory.shift();
+
+    if (motion) motionCount++;
+
+    document.getElementById('tempVal').innerHTML = temp + '<span class="sensor-unit">°C</span>';
+    document.getElementById('humVal').innerHTML = hum.toFixed(1) + '<span class="sensor-unit">%</span>';
+    document.getElementById('motVal').innerHTML = (motion ? 'DETECTED' : 'NONE') + '<span class="sensor-unit"></span>';
+
+    const [statusClass, statusText] = getStatus(temp, hum);
+    document.getElementById('tempStatus').textContent = statusText;
+    document.getElementById('tempStatus').className = 'sensor-status ' + statusClass;
+    document.getElementById('humStatus').textContent = `Relative humidity`;
+    document.getElementById('humStatus').className = 'sensor-status ok';
+    document.getElementById('motStatus').textContent = motion ? '🔴 Motion detected!' : '🟢 Area clear';
+    document.getElementById('motStatus').className = 'sensor-status ' + (motion ? 'alert' : 'ok');
+
+    updateMiniBar('tempBars', tempHistory, 50);
+    updateMiniBar('humBars', humHistory, 100);
+    updateMiniBar('motBars', motHistory, 100);
+
+    const now = new Date();
+    const ts = now.toLocaleTimeString('en-IN', { hour12: false }) + '.' + String(now.getMilliseconds()).padStart(3,'0');
+    const statusStr = statusClass === 'alert' ? 'ALERT' : statusClass === 'warn' ? 'WARN' : 'OK';
+
+    logData.unshift({ id: logData.length + 1, ts, temp, hum: hum.toFixed(1), motion, statusStr, statusClass });
+
+    const tbody = document.getElementById('logBody');
+    const row = tbody.insertRow(0);
+    row.innerHTML = `
+      <td style="color:var(--muted)">${logData.length}</td>
+      <td class="td-time">${ts}</td>
+      <td class="td-temp">${temp}</td>
+      <td class="td-hum">${hum.toFixed(1)}</td>
+      <td class="td-motion">${motion ? '🟡 DETECTED' : '⬛ NONE'}</td>
+      <td class="td-status-${statusClass}">${statusStr}</td>`;
+
+    if (tbody.rows.length > 100) tbody.deleteRow(tbody.rows.length - 1);
+
+    const temps = logData.map(d => d.temp);
+    const hums = logData.map(d => parseFloat(d.hum));
+    document.getElementById('tMin').textContent = Math.min(...temps).toFixed(1);
+    document.getElementById('tMax').textContent = Math.max(...temps).toFixed(1);
+    document.getElementById('hMin').textContent = Math.min(...hums).toFixed(1);
+    document.getElementById('hMax').textContent = Math.max(...hums).toFixed(1);
+    document.getElementById('mCount').textContent = motionCount;
+    document.getElementById('totalCount').textContent = logData.length;
+    document.getElementById('logCount').textContent = logData.length + ' records';
+  }
+
+  function startSim() {
+    if (simInterval) return;
+    document.getElementById('headerBadge').textContent = '● RUNNING';
+    document.getElementById('headerBadge').style.background = 'rgba(63,185,80,0.15)';
+    document.getElementById('headerBadge').style.color = 'var(--green)';
+    simulate();
+    simInterval = setInterval(simulate, interval);
+  }
+
+  function stopSim() {
+    clearInterval(simInterval);
+    simInterval = null;
+    document.getElementById('headerBadge').textContent = '■ STOPPED';
+    document.getElementById('headerBadge').style.background = 'rgba(248,81,73,0.1)';
+    document.getElementById('headerBadge').style.color = 'var(--red)';
+  }
+
+  function clearLog() {
+    logData = [];
+    motionCount = 0;
+    document.getElementById('logBody').innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:2rem">Log cleared. Press ▶ Start to begin.</td></tr>';
+    document.getElementById('logCount').textContent = '0 records';
+    ['tMin','tMax','hMin','hMax','mCount','totalCount'].forEach(id => document.getElementById(id).textContent = id === 'mCount' || id === 'totalCount' ? '0' : '--');
+  }
+
+  function exportCSV() {
+    if (!logData.length) { alert('No data to export. Start simulation first.'); return; }
+    const header = 'ID,Timestamp,Temperature(°C),Humidity(%),Motion,Status\n';
+    const rows = logData.map(d => `${d.id},${d.ts},${d.temp},${d.hum},${d.motion},${d.statusStr}`).join('\n');
+    const blob = new Blob([header + rows], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'sensor_data_' + new Date().toISOString().slice(0,19).replace(/:/g,'-') + '.csv';
+    a.click();
+  }
+
+  function updateInterval() {
+    interval = parseInt(document.getElementById('intervalSel').value);
+    if (simInterval) { stopSim(); startSim(); }
+  }
+
+  function updateScenario() {
+    currentScenario = document.getElementById('scenarioSel').value;
+  }
+</script>
+</body>
+</html>
